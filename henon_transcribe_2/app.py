@@ -149,17 +149,44 @@ def transcript_segment_update(slug):
     with duckdb.connect(transcript.db_filepath) as conn:
         conn.execute(
             """
-        UPDATE segment
-        SET transcript = ?
-        WHERE id::text = ?
+        delete from segment_transcript_edit where segment_id = ?;
         """,
-            (new_transcript, segment_id),
+            [segment_id],
+        )
+        conn.execute(
+            """
+                insert into segment_transcript_edit (segment_id, transcript)
+                values (?, ?);
+                """,
+            [
+                segment_id,
+                new_transcript,
+            ],
         )
         conn.commit()
 
     return jsonify(
         {"action": "update", "segment_id": segment_id, "new_transcript": new_transcript}
     )
+
+
+@app.route("/transcript/<slug>/edit/segment/reset", methods=["POST"])
+def transcript_segment_reset(slug):
+    json_data = request.get_json()
+
+    segment_id = json_data["segment_id"]
+
+    transcript = Transcript.load(slug=slug)
+    with duckdb.connect(transcript.db_filepath) as conn:
+        conn.execute(
+            """
+        delete from segment_transcript_edit where segment_id = ?;
+        """,
+            [segment_id],
+        )
+        conn.commit()
+
+    return jsonify({"action": "reset", "segment_id": segment_id})
 
 
 def main():

@@ -79,7 +79,14 @@ def populate_database(db_filepath, s3_output_key):
 
 def get_segments_pretty_merged(db_filepath):
     with duckdb.connect(db_filepath) as conn:
-        conn.execute("""select * from segment_all;""")
+        conn.execute("""
+        select
+            sa.*,
+            st.id as segment_transcript_edit_id
+        from segment_all sa
+        left join segment_transcript_edit st on st.segment_id::integer = sa.segment_id::integer
+        order by sa.segment_id
+        ;""")
         df = conn.fetch_df()
     return df
 

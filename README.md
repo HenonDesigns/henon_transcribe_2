@@ -18,7 +18,6 @@ TRANSCRIPTS_JSON="data/transcripts.json"
 ```
 
 ## TODO
-- undo merges
 - edit text in a merged segment
 - "notes" field for each segment
   - can they be exported as comments in the word doc

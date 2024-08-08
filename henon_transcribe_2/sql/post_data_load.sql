@@ -12,13 +12,18 @@ create view segment_pretty as (
         seg.id,
         spk.speaker_label,
         spk.speaker_name,
-        seg.transcript,
+        seg.transcript as transcript_original,
+        case
+            when st.segment_id is not null then st.transcript
+            else seg.transcript
+        end as transcript,
         seg.start_time,
         seg.end_time,
         (seg.start_time::float * 100)::integer * interval '0.01 sec' AS start_time_pretty,
         (seg.end_time::float * 100)::integer * interval '0.01 sec' AS end_time_pretty
     from segment seg
     inner join speaker spk on spk.speaker_label = seg.speaker_label
+    left join segment_transcript_edit st on st.segment_id::integer = seg.id::integer
 );
 
 
@@ -68,6 +73,7 @@ create view segment_merged as (
             WHERE id::integer = sms.root_segment_id
             LIMIT 1
         ) as speaker_name,
+        string_agg(sp.transcript_original, ' ' order by sp.id) as transcript_original,
         string_agg(sp.transcript, ' ' order by sp.id) as transcript,
         min(sp.start_time::numeric) as start_time,
         max(sp.end_time::numeric) as end_time
@@ -83,6 +89,7 @@ create view segment_all as (
             sp.id as segment_id,
             array[] as segment_ids,
             sp.speaker_name,
+            sp.transcript_original,
             sp.transcript,
             sp.start_time,
             sp.end_time
@@ -95,6 +102,7 @@ create view segment_all as (
             sm.id as segment_id,
             sm.segment_ids,
             sm.speaker_name,
+            sm.transcript_original,
             sm.transcript,
             sm.start_time,
             sm.end_time
