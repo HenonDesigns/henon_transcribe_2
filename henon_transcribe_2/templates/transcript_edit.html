@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Transcript{% endblock %}
+
+{% block content %}
+<div style="position: fixed; top: 0; z-index: 100; width: 100%; background: #fff;">
+  <audio controls id="recording" src="/{{transcript.recording_filepath}}" type="audio/mpeg"></audio>
+</div>
+
+<div style="margin-top: 75px;">
+  <table class="edit-table" border="1">
+    <thead>
+      <tr>
+        <th>Root Segment</th>
+        <th class="max-width">Merged Segments</th>
+        <th>Segment Action</th>
+        <th>Speaker</th>
+        <th>Text Action</th>
+        <th>Text</th>
+        <th>Start</th>
+        <th>End</th>
+        <th>Audio</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for idx, row in segments_df.iterrows() %}
+        <tr>
+          <td><code>{{row.segment_id}}</code></td>
+          <td class="max-width"><code>{{ row.segment_ids|join(',') }}]</code></td>
+          <td><button class="merge-button" data-id="{{row.segment_id}}">⬆️</button></td>
+          <td>{{row.speaker_name}}</td>
+          <td><button onclick="updateSegmentTranscript('{{row.segment_id}}')">✏️</button></td>
+          <td id="segment_{{row.segment_id}}" contenteditable="true">{{row.transcript}}</td>
+          <td><code>{{row.start_time}}</code></td>
+          <td><code>{{row.end_time}}</code></td>
+          <td><button class=".button-black" onclick="playAudioSection({{ row.start_time }}, {{ row.end_time }})">⏯️</button></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  function playAudioSection(startTime, endTime) {
+      var audio = document.getElementById('recording');
+      audio.pause();
+      audio.currentTime = startTime;
+      audio.play();
+      audio.ontimeupdate = function() {
+          if (audio.currentTime >= endTime) {
+              audio.pause();
+              audio.ontimeupdate = null;
+          }
+      };
+  }
+</script>
+<script>
+function updateSegmentTranscript(segmentId) {
+    var segmentElement = document.getElementById('segment_' + segmentId);
+    var newTranscript = segmentElement.innerText;
+
+    fetch('/transcript/{{transcript.slug}}/edit/segment/update', {  // The endpoint we defined earlier
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ "segment_id": segmentId, "new_transcript": newTranscript }),  // Send data to server
+    })
+    .then(response => response.json())
+    .then(data => {
+      showToast('Update successful!');
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+    });
+}
+</script>
+<script>
+  function showToast(message) {
+    // Create toast element
+    var toast = document.createElement('div');
+    toast.setAttribute('class', 'toast');
+    toast.innerText = message;
+
+    document.body.appendChild(toast);
+
+    // Remove the toast after a certain amount of time
+    setTimeout(() => {
+        toast.remove();
+    }, 2000);
+  }
+</script>
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    let tds = document.querySelectorAll('td[contenteditable=true]');
+    tds.forEach(td => {
+      td.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || e.keyCode === 13)) {
+          e.preventDefault();
+          let segment_id = this.id.replace('segment_', '');
+          let new_text = this.textContent;
+          updateSegmentTranscript(segment_id, new_text);
+        }
+      });
+    });
+  });
+</script>
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    let mergeButtons = document.querySelectorAll('.merge-button');
+
+    mergeButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        let segmentId = this.dataset.id;
+
+        fetch(`/transcript/{{transcript.slug}}/edit/segment/merge/${segmentId}`, {
+          method: 'POST',
+        }).then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          location.reload(); // TODO: more surgical change from new data returned
+          showToast('Segment merge successful!');
+        }).catch(error => {
+          console.error('There has been a problem with your fetch operation:', error);
+        });
+      });
+    });
+  });
+</script>
+{% endblock %}

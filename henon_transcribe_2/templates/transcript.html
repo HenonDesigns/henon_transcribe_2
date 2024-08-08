@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Transcript{% endblock %}
+
+{% block content %}
+
+<h1>Transcript: "{{transcript.name}}"</h1>
+
+<h2>Audio File</h2>
+{% if not transcript.recording_filepath %}
+    <form action="{{ url_for('upload_transcript', slug=transcript.slug) }}" method="post" enctype="multipart/form-data">
+        <input type="file" name="audiofile">
+        <input type="submit">
+    </form>
+{% else %}
+<ul>
+    <li>Recording: <code>{{transcript.recording_filepath}}</code></li>
+    <li>S3 Recording: <code>{{transcript.s3_recording_uri}}</code></li>
+    <li>Transcribe Job: <a href="https://us-east-1.console.aws.amazon.com/transcribe/home?region=us-east-1#job-details/{{transcript.slug}}" target="_blank">{{transcript.slug}} [{{transcript.job_status}}]</a></li>
+    {% if transcript.job_status == 'COMPLETED' %}
+        <li><a href="{{url_for('transcript_edit', slug=transcript.slug)}}">✏️ Edit Transcript</a></li>
+    {% endif %}
+</ul>
+
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Transcript{% endblock %}
+
+{% block content %}
+
+<h1>Henon Transcript</h1>
+
+<h2>Create New Transcript</h2>
+<form method="POST" action="{{ url_for('transcript_new') }}">
+    <input name="name" placeholder="Transcript Name">
+    <button type="submit">Create</button>
+</form>
+
+<h2>Existing Transcripts</h2>
+{% if transcripts %}
+    <ul>
+        {% for transcript in transcripts %}
+        <li><a href="/transcript/{{transcript.slug}}">{{transcript.name}}</a></li>
+        {% endfor %}
+    </ul>
+{% else %}
+<p>Nothing yet comrade!</p>
+{% endif %}
+
+{% endblock %}

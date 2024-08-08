@@ -1,0 +1,18 @@
+.toast {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10px;
+    color: white;
+    background: #006400;
+    border-radius: 5px;
+    z-index: 10000;
+}
+.max-width {
+    width: 80px;
+    overflow-wrap: anywhere;
+}
+.edit-table td {
+    padding:5px;
+}
