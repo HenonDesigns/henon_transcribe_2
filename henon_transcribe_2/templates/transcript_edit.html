@@ -26,9 +26,22 @@
       {% for idx, row in segments_df.iterrows() %}
         <tr>
           <td><code>{{row.segment_id}}</code></td>
-          <td class="max-width"><code>{{ row.segment_ids|join(',') }}]</code></td>
-          <td><button class="merge-button" data-id="{{row.segment_id}}">⬆️</button></td>
-          <td>{{row.speaker_name}}</td>
+          <td class="max-width"><code>
+            {% if row.segment_ids.any() %}
+              [{{ row.segment_ids|join(',') }}]
+            {% else %}
+              None
+            {% endif %}
+          </code></td>
+          <td>
+            {% if row.segment_id > 0 %}
+              <button class="merge-button" data-id="{{row.segment_id}}">⬆️</button>
+            {% endif %}
+            {% if row.segment_ids.any() %}
+              <button class="remove-merge-button" data-id="{{row.segment_id}}">❌</button>
+            {% endif %}
+          </td>
+          <td contenteditable="true">{{row.speaker_name}}</td>
           <td><button onclick="updateSegmentTranscript('{{row.segment_id}}')">✏️</button></td>
           <td id="segment_{{row.segment_id}}" contenteditable="true">{{row.transcript}}</td>
           <td><code>{{row.start_time}}</code></td>
@@ -105,6 +118,8 @@ function updateSegmentTranscript(segmentId) {
     });
   });
 </script>
+
+<!-- merge up segment -->
 <script>
   window.addEventListener('DOMContentLoaded', (event) => {
     let mergeButtons = document.querySelectorAll('.merge-button');
@@ -121,6 +136,31 @@ function updateSegmentTranscript(segmentId) {
           }
           location.reload(); // TODO: more surgical change from new data returned
           showToast('Segment merge successful!');
+        }).catch(error => {
+          console.error('There has been a problem with your fetch operation:', error);
+        });
+      });
+    });
+  });
+</script>
+
+<!-- remove segment merges -->
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    let mergeButtons = document.querySelectorAll('.remove-merge-button');
+
+    mergeButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        let segmentId = this.dataset.id;
+
+        fetch(`/transcript/{{transcript.slug}}/edit/segment/unmerge/${segmentId}`, {
+          method: 'POST',
+        }).then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          location.reload(); // TODO: more surgical change from new data returned
+          showToast('Segment unmerge successful!');
         }).catch(error => {
           console.error('There has been a problem with your fetch operation:', error);
         });

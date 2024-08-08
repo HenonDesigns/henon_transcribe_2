@@ -18,11 +18,10 @@ TRANSCRIPTS_JSON="data/transcripts.json"
 ```
 
 ## TODO
-- show timestamp as `hh:mm:ss`
-- show segments ids as ranage like `[0..14]`
-- edit speaker (dropdown?) --> _always_ dropdown
 - undo merges
 - edit text in a merged segment
-- export to word
 - "notes" field for each segment
   - can they be exported as comments in the word doc
+- export to word
+- show timestamp as `hh:mm:ss`
+- edit speaker

@@ -100,16 +100,40 @@ def custom_data_static(filename):
 @app.route("/transcript/<slug>/edit/segment/merge/<segment_id>", methods=["POST"])
 def transcript_segment_merge(slug, segment_id):
     transcript = Transcript.load(slug=slug)
-    with duckdb.connect(transcript.db_filepath) as conn:
-        conn.execute(f"""
-        insert into segment_merge (segment_id) values ({segment_id})
-        """)
+
+    if int(segment_id) > 0:
+        with duckdb.connect(transcript.db_filepath) as conn:
+            conn.execute(f"""
+            insert into segment_merge (segment_id) values ({segment_id})
+            """)
 
     return jsonify(
         {
             "action": "merge",
             "segment_id": segment_id,
             "merged_segment_id": str(int(segment_id) + 1),
+        }
+    )
+
+
+@app.route("/transcript/<slug>/edit/segment/unmerge/<segment_id>", methods=["POST"])
+def transcript_segment_unmerge(slug, segment_id):
+    transcript = Transcript.load(slug=slug)
+
+    with duckdb.connect(transcript.db_filepath) as conn:
+        conn.execute(f"""
+        delete from segment_merge
+        where segment_id in (
+            select unnest(path) 
+            from segment_merge_sets
+            where root_segment_id = {segment_id}
+        )
+        """)
+
+    return jsonify(
+        {
+            "action": "unmerge",
+            "segment_id": segment_id,
         }
     )
 
