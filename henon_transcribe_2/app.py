@@ -92,6 +92,19 @@ def transcript_edit(slug):
     )
 
 
+@app.route("/transcript/<slug>/table/html", methods=["GET"])
+def transcript_table_html(slug):
+    transcript = Transcript.load(slug=slug)
+    if not os.path.exists(transcript.db_filepath):
+        init_database(transcript.db_filepath)
+        populate_database(transcript.db_filepath, transcript.s3_output_key)
+    segments_df = get_segments_pretty_merged(transcript.db_filepath)
+    return render_template(
+        "transcript_table.html",
+        segments_df=segments_df,
+    )
+
+
 @app.route("/data/<path:filename>", methods=["GET"])
 def custom_data_static(filename):
     return send_from_directory("../data", filename)
@@ -138,11 +151,10 @@ def transcript_segment_unmerge(slug, segment_id):
     )
 
 
-@app.route("/transcript/<slug>/edit/segment/update", methods=["POST"])
-def transcript_segment_update(slug):
+@app.route("/transcript/<slug>/edit/segment/text/update/<segment_id>", methods=["POST"])
+def transcript_segment_update(slug, segment_id):
     json_data = request.get_json()
 
-    segment_id = json_data["segment_id"]
     new_transcript = json_data["new_transcript"]
 
     transcript = Transcript.load(slug=slug)
@@ -170,12 +182,8 @@ def transcript_segment_update(slug):
     )
 
 
-@app.route("/transcript/<slug>/edit/segment/reset", methods=["POST"])
-def transcript_segment_reset(slug):
-    json_data = request.get_json()
-
-    segment_id = json_data["segment_id"]
-
+@app.route("/transcript/<slug>/edit/segment/text/reset/<segment_id>", methods=["POST"])
+def transcript_segment_reset(slug, segment_id):
     transcript = Transcript.load(slug=slug)
     with duckdb.connect(transcript.db_filepath) as conn:
         conn.execute(
