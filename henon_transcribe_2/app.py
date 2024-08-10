@@ -102,6 +102,7 @@ def transcript_table_html(slug):
     return render_template(
         "transcript_table.html",
         segments_df=segments_df,
+        transcript=transcript,
     )
 
 
@@ -153,16 +154,16 @@ def transcript_segment_unmerge(slug, segment_id):
 
 @app.route("/transcript/<slug>/edit/segment/text/update/<segment_id>", methods=["POST"])
 def transcript_segment_update(slug, segment_id):
-    json_data = request.get_json()
+    transcript = Transcript.load(slug=slug)
 
+    json_data = request.get_json()
     new_transcript = json_data["new_transcript"]
 
-    transcript = Transcript.load(slug=slug)
     with duckdb.connect(transcript.db_filepath) as conn:
         conn.execute(
             """
-        delete from segment_transcript_edit where segment_id = ?;
-        """,
+                delete from segment_transcript_edit where segment_id = ?;
+                """,
             [segment_id],
         )
         conn.execute(
