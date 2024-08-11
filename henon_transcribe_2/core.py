@@ -88,6 +88,9 @@ def get_segments_pretty_merged(db_filepath):
         order by sa.segment_id
         ;""")
         df = conn.fetch_df()
+
+    df["is_merged"] = df.segment_ids.apply(lambda value: len(value) > 0)
+
     return df
 
 
@@ -173,3 +176,15 @@ class Transcript:
     @property
     def job_status(self):
         return self.get_status()["TranscriptionJob"]["TranscriptionJobStatus"]
+
+    def get_merged_segment_ids(self, conn, root_segment_id):
+        segment_ids = conn.execute(
+            """
+            select array_sort(path) as segment_ids
+            from segment_merge_sets
+            where root_segment_id = ?;""",
+            [root_segment_id],
+        ).fetchone()
+        if segment_ids:
+            segment_ids = segment_ids[0]
+        return segment_ids

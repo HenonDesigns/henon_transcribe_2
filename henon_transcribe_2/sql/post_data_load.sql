@@ -98,15 +98,16 @@ create view segment_all as (
 
         union all
 
-        select
+        select distinct
             sm.id as segment_id,
             sm.segment_ids,
             sm.speaker_name,
             sm.transcript_original,
-            sm.transcript,
+            ste.transcript, -- used merged form, which is an "edit"
             sm.start_time,
             sm.end_time
         from segment_merged sm
+        left join segment_transcript_edit ste on ste.segment_ids = sm.segment_ids
     )
     select * from us order by segment_id
 );

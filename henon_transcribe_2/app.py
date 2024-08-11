@@ -117,8 +117,21 @@ def transcript_segment_merge(slug, segment_id):
 
     if int(segment_id) > 0:
         with duckdb.connect(transcript.db_filepath) as conn:
+            # add segment merge
             conn.execute(f"""
             insert into segment_merge (segment_id) values ({segment_id})
+            """)
+
+            # add new transcript edit for merge
+            segment_ids = f"array[{int(segment_id) - 1},{segment_id}]"
+            conn.execute(f"""
+            insert into segment_transcript_edit (segment_ids, transcript) values (
+                {segment_ids},
+                (
+                    select transcript from segment_merged
+                    where segment_ids = {segment_ids}
+                )
+            );
             """)
 
     return jsonify(
@@ -135,6 +148,14 @@ def transcript_segment_unmerge(slug, segment_id):
     transcript = Transcript.load(slug=slug)
 
     with duckdb.connect(transcript.db_filepath) as conn:
+        segment_ids = transcript.get_merged_segment_ids(conn, segment_id)
+        if segment_ids:
+            target_column = "segment_ids"
+            target_value = segment_ids
+        else:
+            target_column = "segment_id"
+            target_value = segment_id
+
         conn.execute(f"""
         delete from segment_merge
         where segment_id in (
@@ -143,6 +164,13 @@ def transcript_segment_unmerge(slug, segment_id):
             where root_segment_id = {segment_id}
         )
         """)
+
+        conn.execute(
+            f"""
+                delete from segment_transcript_edit where {target_column} = ?;
+                """,
+            [target_value],
+        )
 
     return jsonify(
         {
@@ -160,24 +188,34 @@ def transcript_segment_update(slug, segment_id):
     new_transcript = json_data["new_transcript"]
 
     with duckdb.connect(transcript.db_filepath) as conn:
+        segment_ids = transcript.get_merged_segment_ids(conn, segment_id)
+        if segment_ids:
+            target_column = "segment_ids"
+            target_value = segment_ids
+        else:
+            target_column = "segment_id"
+            target_value = segment_id
+
         conn.execute(
-            """
-                delete from segment_transcript_edit where segment_id = ?;
+            f"""
+                delete from segment_transcript_edit where {target_column} = ?;
                 """,
-            [segment_id],
+            [target_value],
         )
         conn.execute(
-            """
-                insert into segment_transcript_edit (segment_id, transcript)
+            f"""
+                insert into segment_transcript_edit ({target_column}, transcript)
                 values (?, ?);
                 """,
             [
-                segment_id,
+                target_value,
                 new_transcript,
             ],
         )
+
         conn.commit()
 
+    # TODO: update this response...
     return jsonify(
         {"action": "update", "segment_id": segment_id, "new_transcript": new_transcript}
     )
@@ -187,14 +225,23 @@ def transcript_segment_update(slug, segment_id):
 def transcript_segment_reset(slug, segment_id):
     transcript = Transcript.load(slug=slug)
     with duckdb.connect(transcript.db_filepath) as conn:
+        segment_ids = transcript.get_merged_segment_ids(conn, segment_id)
+        if segment_ids:
+            target_column = "segment_ids"
+            target_value = segment_ids
+        else:
+            target_column = "segment_id"
+            target_value = segment_id
+
         conn.execute(
-            """
-        delete from segment_transcript_edit where segment_id = ?;
+            f"""
+        delete from segment_transcript_edit where {target_column} = ?;
         """,
-            [segment_id],
+            [target_value],
         )
         conn.commit()
 
+    # TODO: update this response...
     return jsonify({"action": "reset", "segment_id": segment_id})
 
 

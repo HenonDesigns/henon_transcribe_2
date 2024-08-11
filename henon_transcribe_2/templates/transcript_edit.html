@@ -3,7 +3,7 @@
 {% block title %}Transcript{% endblock %}
 
 {% block content %}
-<div style="position: fixed; top: 0; z-index: 100; width: 100%; background: #fff;">
+<div style="position: fixed; top: 40px; z-index: 100; width: 100%; background: #fff;">
   <audio controls id="recording" src="/{{transcript.recording_filepath}}" type="audio/mpeg"></audio>
 </div>
 
@@ -138,4 +138,5 @@
   };
 
 </script>
+
 {% endblock %}

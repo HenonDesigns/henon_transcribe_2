@@ -22,5 +22,6 @@ create sequence transcript_edit_seq start 1;
 create table segment_transcript_edit (
     id integer default nextval('transcript_edit_seq'),
     segment_id int,
+    segment_ids int[],
     transcript text
 );

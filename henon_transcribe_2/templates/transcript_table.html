@@ -34,7 +34,7 @@
       <td contenteditable="true">{{row.speaker_name}}</td>
       <td>
         <button onclick="updateSegmentTranscript('{{row.segment_id}}')">✏️</button>
-        {% if row.segment_transcript_edit_id >= 0 %}
+        {% if row.segment_transcript_edit_id >= 0 and not row.is_merged %}
           <button onclick="resetSegmentTranscript('{{row.segment_id}}')">❌</button>
         {% endif %}
       </td>
