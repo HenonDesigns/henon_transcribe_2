@@ -1,4 +1,5 @@
 import os.path
+import time
 
 import duckdb
 from flask import (
@@ -22,6 +23,15 @@ from henon_transcribe_2.core import (
 )
 
 app = Flask(__name__)
+
+
+@app.template_filter("seconds_to_time")
+def seconds_to_time(seconds_str):
+    seconds = float(seconds_str)
+    hours, rem = divmod(seconds, 3600)
+    minutes, seconds = divmod(rem, 60)
+    time_format = "{:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds)
+    return time_format
 
 
 @app.route("/")

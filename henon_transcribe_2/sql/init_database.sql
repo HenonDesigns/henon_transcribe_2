@@ -25,3 +25,10 @@ create table segment_transcript_edit (
     segment_ids int[],
     transcript text
 );
+
+create sequence segment_note_seq start 1;
+create table segment_note (
+    id integer default nextval('segment_note_seq'),
+    segment_id int,
+    note text
+);
