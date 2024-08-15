@@ -166,7 +166,7 @@ def transcript_segment_merge(slug, segment_id):
                     )
                     select
                         case when (select count(*) from sub_edit) > 0 then
-                            concat((select transcript from segment_pretty where id = {segment_id}), ' ', (select transcript from sub_edit))
+                            concat((select transcript from segment_pretty where id = {segment_id-1}), ' ', (select transcript from sub_edit))
                         else
                             (select transcript from merged limit 1)
                         end as transcript
