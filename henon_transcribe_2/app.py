@@ -125,6 +125,7 @@ def custom_data_static(filename):
 def transcript_segment_merge(slug, segment_id):
     transcript = Transcript.load(slug=slug)
 
+    segment_id = int(segment_id)
     if int(segment_id) > 0:
         with duckdb.connect(transcript.db_filepath) as conn:
             # add segment merge
@@ -133,16 +134,46 @@ def transcript_segment_merge(slug, segment_id):
             """)
 
             # add new transcript edit for merge
-            segment_ids = f"array[{int(segment_id) - 1},{segment_id}]"
-            conn.execute(f"""
+            segment_ids = conn.execute(
+                """
+            select segment_ids
+            from segment_transcript_edit
+            where ? = any(segment_ids)
+            limit 1
+            """,
+                [segment_id],
+            ).fetchone()
+            if segment_ids:
+                segment_ids = segment_ids[0]
+                segment_ids.insert(0, segment_id - 1)
+            else:
+                segment_ids = [segment_id - 1, segment_id]
+            segment_ids = f"array{segment_ids}"
+
+            query = f"""
             insert into segment_transcript_edit (segment_ids, transcript) values (
                 {segment_ids},
                 (
-                    select transcript from segment_merged
-                    where segment_ids = {segment_ids}
+                    with sub_edit as (
+                        select transcript from segment_transcript_edit
+                        where segment_ids <@ {segment_ids}
+                        order by array_length(segment_ids) desc
+                    ),
+                    merged as (
+                        select transcript from segment_merged
+                        where segment_ids = {segment_ids}
+                        limit 1
+                    )
+                    select
+                        case when (select count(*) from sub_edit) > 0 then
+                            concat((select transcript from segment_pretty where id = {segment_id}), ' ', (select transcript from sub_edit))
+                        else
+                            (select transcript from merged limit 1)
+                        end as transcript
                 )
             );
-            """)
+            """
+            conn.execute(query)
 
     return jsonify(
         {
@@ -161,7 +192,7 @@ def transcript_segment_unmerge(slug, segment_id):
         segment_ids = transcript.get_merged_segment_ids(conn, segment_id)
         if segment_ids:
             target_column = "segment_ids"
-            target_value = segment_ids
+            target_value = f"array{segment_ids}"
         else:
             target_column = "segment_id"
             target_value = segment_id
@@ -175,12 +206,12 @@ def transcript_segment_unmerge(slug, segment_id):
         )
         """)
 
-        conn.execute(
-            f"""
-                delete from segment_transcript_edit where {target_column} = ?;
-                """,
-            [target_value],
-        )
+        delete_query = f"""
+        delete from segment_transcript_edit
+        where {target_column} <@ {target_value};
+        """
+        print(delete_query)
+        conn.execute(delete_query)
 
     return jsonify(
         {
