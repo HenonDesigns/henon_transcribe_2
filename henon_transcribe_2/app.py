@@ -1,3 +1,4 @@
+from functools import wraps
 import os.path
 
 import duckdb
@@ -9,6 +10,7 @@ from flask import (
     redirect,
     url_for,
     send_from_directory,
+    Response,
 )
 import pypandoc
 from werkzeug.utils import secure_filename
@@ -24,6 +26,37 @@ from henon_transcribe_2.core import (
 
 app = Flask(__name__)
 
+USERNAME = os.environ.get("APP_USERNAME")
+PASSWORD = os.environ.get("APP_PASSWORD")
+
+
+def check_auth(username, password):
+    """This function is called to check if a username/password combination is valid."""
+    return username == USERNAME and password == PASSWORD
+
+
+def authenticate():
+    """Sends a 401 response that enables basic auth"""
+    return Response(
+        "Could not verify your access level for that URL.\n"
+        "You have to login with proper credentials",
+        401,
+        {"WWW-Authenticate": 'Basic realm="Login Required"'},
+    )
+
+
+def requires_auth(f):
+    """Decorator function to enforce authentication on routes"""
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+
+    return decorated
+
 
 @app.template_filter("seconds_to_time")
 def seconds_to_time(seconds_str):
@@ -34,18 +67,31 @@ def seconds_to_time(seconds_str):
     return time_format
 
 
+@app.route("/about")
+def about():
+    return "Henon Transcribe v2"
+
+
+@app.route("/logout")
+def logout():
+    return authenticate()
+
+
 @app.route("/")
+@requires_auth
 def home():
     transcripts = Transcript.list_transcripts()
     return render_template("home.html", transcripts=transcripts)
 
 
 @app.route("/data/<path:filename>", methods=["GET"])
+@requires_auth
 def custom_data_static(filename):
     return send_from_directory("../data", filename)
 
 
 @app.route("/transcript/new", methods=["GET", "POST"])
+@requires_auth
 def transcript_new():
     if request.method == "POST":
         name = request.form.get("name")
@@ -56,12 +102,14 @@ def transcript_new():
 
 
 @app.route("/transcript/<slug>")
+@requires_auth
 def transcript(slug):
     transcript = Transcript.load(slug=slug)
     return render_template("transcript.html", transcript=transcript)
 
 
 @app.route("/transcript/<slug>/upload", methods=["POST"])
+@requires_auth
 def upload_transcript(slug):
     transcript = Transcript.load(slug=slug)
 
@@ -90,6 +138,7 @@ def upload_transcript(slug):
 
 
 @app.route("/transcript/<slug>/edit")
+@requires_auth
 def transcript_edit(slug):
     transcript = Transcript.load(slug=slug)
 
@@ -109,6 +158,7 @@ def transcript_edit(slug):
 
 
 @app.route("/transcript/<slug>/table/html", methods=["GET"])
+@requires_auth
 def transcript_table_html(slug):
     transcript = Transcript.load(slug=slug)
 
@@ -129,6 +179,7 @@ def transcript_table_html(slug):
 
 
 @app.route("/transcript/<slug>/edit/segment/merge/<segment_id>", methods=["POST"])
+@requires_auth
 def transcript_segment_merge(slug, segment_id):
     transcript = Transcript.load(slug=slug)
 
@@ -191,6 +242,7 @@ def transcript_segment_merge(slug, segment_id):
 
 
 @app.route("/transcript/<slug>/edit/segment/split/<segment_id>", methods=["POST"])
+@requires_auth
 def transcript_segment_split(slug, segment_id):
     transcript = Transcript.load(slug=slug)
     segment_id = int(segment_id)
@@ -248,6 +300,7 @@ def transcript_segment_split(slug, segment_id):
 
 
 @app.route("/transcript/<slug>/edit/segment/text/update/<segment_id>", methods=["POST"])
+@requires_auth
 def transcript_segment_update(slug, segment_id):
     transcript = Transcript.load(slug=slug)
 
@@ -273,6 +326,7 @@ def transcript_segment_update(slug, segment_id):
     "/transcript/<slug>/edit/segment/<segment_id>/speaker/update/<speaker_label>",
     methods=["GET"],
 )
+@requires_auth
 def transcript_segment_speaker_update(slug, segment_id, speaker_label):
     transcript = Transcript.load(slug=slug)
 
@@ -291,6 +345,7 @@ def transcript_segment_speaker_update(slug, segment_id, speaker_label):
 
 
 @app.route("/transcript/<slug>/sql", methods=["GET", "POST"])
+@requires_auth
 def transcript_sql(slug):
     transcript = Transcript.load(slug=slug)
 
@@ -313,6 +368,7 @@ def transcript_sql(slug):
 
 
 @app.route("/transcript/<slug>/export", methods=["GET", "POST"])
+@requires_auth
 def transcript_export(slug):
     transcript = Transcript.load(slug=slug)
     segments_df = get_segments_pretty_merged(transcript.db_filepath)
