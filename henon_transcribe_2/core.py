@@ -156,7 +156,10 @@ class Transcript:
     @classmethod
     def new(cls, name):
         slug = slugify(name)
-        with open(f"data/{slug}.info.json", "w") as f:
+        info_filepath = f"data/{slug}.info.json"
+        if os.path.exists(info_filepath):
+            raise Exception("A job already exists with this name/slug")
+        with open(info_filepath, "w") as f:
             f.write(json.dumps({"slug": slug, "name": name}))
         return cls(slug=slug)
 
