@@ -1,5 +1,4 @@
 import os.path
-import time
 
 import duckdb
 from flask import (
@@ -11,6 +10,7 @@ from flask import (
     url_for,
     send_from_directory,
 )
+import pypandoc
 from werkzeug.utils import secure_filename
 
 from henon_transcribe_2.core import (
@@ -38,6 +38,11 @@ def seconds_to_time(seconds_str):
 def home():
     transcripts = Transcript.list_transcripts()
     return render_template("home.html", transcripts=transcripts)
+
+
+@app.route("/data/<path:filename>", methods=["GET"])
+def custom_data_static(filename):
+    return send_from_directory("../data", filename)
 
 
 @app.route("/transcript/new", methods=["GET", "POST"])
@@ -91,9 +96,10 @@ def transcript_edit(slug):
     # init db if needed
     if not os.path.exists(transcript.db_filepath):
         init_database(transcript.db_filepath)
-        populate_database(transcript.db_filepath, transcript.s3_output_key)
+        populate_database(slug, transcript.db_filepath, transcript.s3_output_key)
 
     segments_df = get_segments_pretty_merged(transcript.db_filepath)
+
     return render_template(
         "transcript_edit.html",
         transcript=transcript,
@@ -105,75 +111,75 @@ def transcript_edit(slug):
 @app.route("/transcript/<slug>/table/html", methods=["GET"])
 def transcript_table_html(slug):
     transcript = Transcript.load(slug=slug)
+
     if not os.path.exists(transcript.db_filepath):
         init_database(transcript.db_filepath)
         populate_database(transcript.db_filepath, transcript.s3_output_key)
+
     segments_df = get_segments_pretty_merged(transcript.db_filepath)
+    unique_speakers_df = segments_df[
+        ["speaker_label", "speaker_name"]
+    ].drop_duplicates()
     return render_template(
         "transcript_table.html",
         segments_df=segments_df,
+        unique_speakers_df=unique_speakers_df,
         transcript=transcript,
     )
-
-
-@app.route("/data/<path:filename>", methods=["GET"])
-def custom_data_static(filename):
-    return send_from_directory("../data", filename)
 
 
 @app.route("/transcript/<slug>/edit/segment/merge/<segment_id>", methods=["POST"])
 def transcript_segment_merge(slug, segment_id):
     transcript = Transcript.load(slug=slug)
 
-    segment_id = int(segment_id)
+    bottom_id = int(segment_id)
     if int(segment_id) > 0:
         with duckdb.connect(transcript.db_filepath) as conn:
-            # add segment merge
-            conn.execute(f"""
-            insert into segment_merge (segment_id) values ({segment_id})
-            """)
-
-            # add new transcript edit for merge
-            segment_ids = conn.execute(
+            top_id = conn.execute(
                 """
-            select segment_ids
-            from segment_transcript_edit
-            where ? = any(segment_ids)
-            limit 1
+            select id from segment
+            where id < ?
+            order by id desc
+            limit 1;
+            """,
+                [bottom_id],
+            ).fetchone()[0]
+
+            conn.execute(
+                f"""
+            UPDATE segment
+            SET transcript = (
+                SELECT CONCAT(s1.transcript, ' ', s2.transcript)
+                FROM segment AS s1, segment AS s2
+                WHERE s1.id = ? AND s2.id = ?
+            ),
+            end_time = (
+                SELECT s2.end_time
+                FROM segment AS s2
+                WHERE s2.id = ?
+            )
+            WHERE id = ?;
+            """,
+                [top_id, bottom_id, bottom_id, top_id],
+            )
+
+            conn.execute(
+                f"""
+            delete from segment
+            where id = ?
+            """,
+                [bottom_id],
+            )
+
+            # TODO: decrement all ids by one
+            conn.execute(
+                """
+            update segment
+            set id = id::integer - 1
+            where id > ?
             """,
                 [segment_id],
-            ).fetchone()
-            if segment_ids:
-                segment_ids = segment_ids[0]
-                segment_ids.insert(0, segment_id - 1)
-            else:
-                segment_ids = [segment_id - 1, segment_id]
-            segment_ids = f"array{segment_ids}"
-
-            query = f"""
-            insert into segment_transcript_edit (segment_ids, transcript) values (
-                {segment_ids},
-                (
-                    with sub_edit as (
-                        select transcript from segment_transcript_edit
-                        where segment_ids <@ {segment_ids}
-                        order by array_length(segment_ids) desc
-                    ),
-                    merged as (
-                        select transcript from segment_merged
-                        where segment_ids = {segment_ids}
-                        limit 1
-                    )
-                    select
-                        case when (select count(*) from sub_edit) > 0 then
-                            concat((select transcript from segment_pretty where id = {segment_id-1}), ' ', (select transcript from sub_edit))
-                        else
-                            (select transcript from merged limit 1)
-                        end as transcript
-                )
-            );
-            """
-            conn.execute(query)
+            )
 
     return jsonify(
         {
@@ -184,39 +190,59 @@ def transcript_segment_merge(slug, segment_id):
     )
 
 
-@app.route("/transcript/<slug>/edit/segment/unmerge/<segment_id>", methods=["POST"])
-def transcript_segment_unmerge(slug, segment_id):
+@app.route("/transcript/<slug>/edit/segment/split/<segment_id>", methods=["POST"])
+def transcript_segment_split(slug, segment_id):
     transcript = Transcript.load(slug=slug)
+    segment_id = int(segment_id)
+    split_data = request.get_json()
+    print(split_data)
 
     with duckdb.connect(transcript.db_filepath) as conn:
-        segment_ids = transcript.get_merged_segment_ids(conn, segment_id)
-        if segment_ids:
-            target_column = "segment_ids"
-            target_value = f"array{segment_ids}"
-        else:
-            target_column = "segment_id"
-            target_value = segment_id
-
-        conn.execute(f"""
-        delete from segment_merge
-        where segment_id in (
-            select unnest(path) 
-            from segment_merge_sets
-            where root_segment_id = {segment_id}
+        # update split segment
+        conn.execute(
+            """
+        update segment
+        set end_time = ?,
+            transcript = ?
+        where id = ?
+        """,
+            [
+                split_data["split_time"],
+                split_data["pre_split_text"],
+                segment_id,
+            ],
         )
-        """)
 
-        delete_query = f"""
-        delete from segment_transcript_edit
-        where {target_column} <@ {target_value};
-        """
-        print(delete_query)
-        conn.execute(delete_query)
+        conn.execute(
+            """
+        update segment
+        set id = id + 1
+        where id > ?
+        """,
+            [segment_id],
+        )
+
+        conn.execute(
+            """
+        insert into segment (id, transcript, speaker_label, start_time, end_time)
+        values (?, ?, ?, ?, ?)
+        """,
+            [
+                segment_id + 1,
+                split_data["post_split_text"],
+                split_data["speaker_label"],
+                split_data["split_time"],
+                split_data["end_time"],
+            ],
+        )
+
+        conn.commit()
 
     return jsonify(
         {
-            "action": "unmerge",
+            "action": "merge",
             "segment_id": segment_id,
+            "merged_segment_id": str(int(segment_id) + 1),
         }
     )
 
@@ -229,61 +255,87 @@ def transcript_segment_update(slug, segment_id):
     new_transcript = json_data["new_transcript"]
 
     with duckdb.connect(transcript.db_filepath) as conn:
-        segment_ids = transcript.get_merged_segment_ids(conn, segment_id)
-        if segment_ids:
-            target_column = "segment_ids"
-            target_value = segment_ids
-        else:
-            target_column = "segment_id"
-            target_value = segment_id
-
         conn.execute(
-            f"""
-                delete from segment_transcript_edit where {target_column} = ?;
-                """,
-            [target_value],
-        )
-        conn.execute(
-            f"""
-                insert into segment_transcript_edit ({target_column}, transcript)
-                values (?, ?);
-                """,
-            [
-                target_value,
-                new_transcript,
-            ],
+            """
+        update segment
+        set transcript = ?
+        where id = ?
+        """,
+            [new_transcript, segment_id],
         )
 
         conn.commit()
 
-    # TODO: update this response...
-    return jsonify(
-        {"action": "update", "segment_id": segment_id, "new_transcript": new_transcript}
+    return jsonify({"success": True})
+
+
+@app.route(
+    "/transcript/<slug>/edit/segment/<segment_id>/speaker/update/<speaker_label>",
+    methods=["GET"],
+)
+def transcript_segment_speaker_update(slug, segment_id, speaker_label):
+    transcript = Transcript.load(slug=slug)
+
+    with duckdb.connect(transcript.db_filepath) as conn:
+        conn.execute(
+            """
+        update segment
+        set speaker_label = ?
+        where id = ?
+        """,
+            [speaker_label, segment_id],
+        )
+        conn.commit()
+
+    return jsonify({"success": True})
+
+
+@app.route("/transcript/<slug>/sql", methods=["GET", "POST"])
+def transcript_sql(slug):
+    transcript = Transcript.load(slug=slug)
+
+    sql = "Enter your query here..."
+    results = """<p>Nothing yet...</p>"""
+    if request.method == "POST":
+        sql = request.form["sql"]
+        with duckdb.connect(transcript.db_filepath) as conn:
+            try:
+                results = conn.execute(sql).fetch_df().to_html(index=False)
+            except Exception as exc:
+                results = f"<pre><code>{str(exc)}</code></pre>"
+
+    return render_template(
+        "sql.html",
+        transcript=transcript,
+        sql=sql,
+        results=results,
     )
 
 
-@app.route("/transcript/<slug>/edit/segment/text/reset/<segment_id>", methods=["POST"])
-def transcript_segment_reset(slug, segment_id):
+@app.route("/transcript/<slug>/export", methods=["GET", "POST"])
+def transcript_export(slug):
     transcript = Transcript.load(slug=slug)
-    with duckdb.connect(transcript.db_filepath) as conn:
-        segment_ids = transcript.get_merged_segment_ids(conn, segment_id)
-        if segment_ids:
-            target_column = "segment_ids"
-            target_value = segment_ids
-        else:
-            target_column = "segment_id"
-            target_value = segment_id
+    segments_df = get_segments_pretty_merged(transcript.db_filepath)
 
-        conn.execute(
-            f"""
-        delete from segment_transcript_edit where {target_column} = ?;
-        """,
-            [target_value],
+    export_method = request.args.get("method", "html")
+
+    if export_method == "html":
+        return render_template("html_export.html", segments_df=segments_df)
+
+    elif export_method == "word":
+        export_html = render_template(
+            "html_export.html",
+            segments_df=segments_df,
         )
-        conn.commit()
 
-    # TODO: update this response...
-    return jsonify({"action": "reset", "segment_id": segment_id})
+        # convert HTML to word doc
+        output_file = f"/tmp/{transcript.slug}.docx"
+        pypandoc.convert_text(
+            export_html, to="docx", format="html", outputfile=output_file
+        )
+        return send_from_directory("/tmp", f"{transcript.slug}.docx")
+    else:
+        return "Export method not recognized."
 
 
 def main():

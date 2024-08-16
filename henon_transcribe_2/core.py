@@ -59,8 +59,13 @@ def init_database(db_filepath):
         conn.commit()
 
 
-def populate_database(db_filepath, s3_output_key):
-    results = get_job_output(s3_output_key)["results"]
+def populate_database(slug, db_filepath, s3_output_key):
+    local_path = f"data/{slug}.raw.json"
+    if os.path.exists(local_path):
+        with open(local_path) as f:
+            results = json.load(f)["results"]
+    else:
+        results = get_job_output(s3_output_key)["results"]
 
     with duckdb.connect(db_filepath) as conn:
         # create "segments" table
@@ -79,19 +84,12 @@ def populate_database(db_filepath, s3_output_key):
 
 def get_segments_pretty_merged(db_filepath):
     with duckdb.connect(db_filepath) as conn:
-        conn.execute("""
-        select
-            sa.*,
-            st.id as segment_transcript_edit_id
-        from segment_all sa
-        left join segment_transcript_edit st on st.segment_id::integer = sa.segment_id::integer
-        order by sa.segment_id
-        ;""")
-        df = conn.fetch_df()
-
-    df["is_merged"] = df.segment_ids.apply(lambda value: len(value) > 0)
-
-    return df
+        df = conn.execute("""
+        select *
+        from segment_pretty sp
+        order by sp.id
+        ;""").fetch_df()
+        return df
 
 
 def rebuild(slug):

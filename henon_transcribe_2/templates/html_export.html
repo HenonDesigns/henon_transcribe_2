@@ -1,0 +1,34 @@
+<html>
+    <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+        >
+    </head>
+    <body>
+        <main class="container">
+            <table class="export">
+            <thead>
+              <tr>
+                <th>Segment ID</th>
+                <th>Speaker</th>
+                <th>Text</th>
+                <th>Start</th>
+                <th>End</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for idx, row in segments_df.iterrows() %}
+                <tr>
+                  <td><code>{{row.id}}</code></td>
+                  <td><code>{{row.speaker_name}}</code></td>
+                  <td>{{row.transcript}}</td>
+                  <td><code>{{row.start_time | seconds_to_time}}</code></td>
+                  <td><code>{{row.end_time | seconds_to_time}}</code></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+        </table>
+        </main>
+    </body>
+</html>

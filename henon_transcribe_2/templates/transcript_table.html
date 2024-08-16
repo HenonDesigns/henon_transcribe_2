@@ -2,10 +2,8 @@
 <thead>
   <tr>
     <th>Root Segment</th>
-    <th>Segment Action</th>
-    <th class="max-width">Merged Segments</th>
     <th>Speaker</th>
-    <th>Text Action</th>
+    <th>Actions</th>
     <th>Text</th>
     <th>Start</th>
     <th>End</th>
@@ -15,30 +13,25 @@
 <tbody>
   {% for idx, row in segments_df.iterrows() %}
     <tr>
-      <td><code>{{row.segment_id}}</code></td>
+      <td><code>{{row.id}}</code></td>
       <td>
-        {% if row.segment_id > 0 %}
-          <button class="merge-button" data-id="{{row.segment_id}}">⬆️</button>
-        {% endif %}
-        {% if row.segment_ids.any() %}
-          <button class="remove-merge-button" data-id="{{row.segment_id}}">❌</button>
-        {% endif %}
+        <select name="speaker" onchange="updateSegmentSpeaker(this, {{row.id}})">
+            {% for idx, speaker in unique_speakers_df.iterrows() %}
+                <option value="{{ speaker.speaker_label }}"
+                    {% if speaker.speaker_name == row.speaker_name %} selected {% endif %}>
+                    {{ speaker.speaker_name }}
+                </option>
+            {% endfor %}
+        </select>
       </td>
-      <td class="max-width"><code>
-        {% if row.segment_ids.any() %}
-          [{{ row.segment_ids|join(',') }}]
-        {% else %}
-          None
-        {% endif %}
-      </code></td>
-      <td contenteditable="true">{{row.speaker_name}}</td>
       <td>
-        <button onclick="updateSegmentTranscript('{{row.segment_id}}')">✏️</button>
-        {% if row.segment_transcript_edit_id >= 0 and not row.is_merged %}
-          <button onclick="resetSegmentTranscript('{{row.segment_id}}')">❌</button>
+        {% if row.id > 0 %}
+          <button class="merge-button" data-id="{{row.id}}">⬆️</button>
         {% endif %}
+        <button onclick="updateSegmentSplit('{{row.id}}', '{{row.speaker_label}}', {{row.start_time}}, {{row.end_time}})">⤵️</button>
+        <button onclick="updateSegmentTranscript('{{row.id}}')">✏️</button>
       </td>
-      <td id="segment_{{row.segment_id}}" contenteditable="true">{{row.transcript}}</td>
+      <td id="segment_{{row.id}}" contenteditable="true">{{row.transcript}}</td>
       <td><code>{{row.start_time | seconds_to_time}}</code></td>
       <td><code>{{row.end_time | seconds_to_time}}</code></td>
       <td><button class=".button-black" onclick="playAudioSection({{ row.start_time }}, {{ row.end_time }})">⏯️</button></td>

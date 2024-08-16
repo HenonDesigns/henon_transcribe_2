@@ -7,135 +7,176 @@
   <audio controls id="recording" src="/{{transcript.recording_filepath}}" type="audio/mpeg"></audio>
 </div>
 
-<div style="margin-top: 75px">
+<div style="margin-top: 85px">
   <table class="edit-table" border="1"></table>
+</div>
+
+<div style="margin-top: 20px">
+  <ul>
+    <li>Export:<ul>
+      <li><a href="/transcript/{{transcript.slug}}/export?method=html">HTML</a></li>
+      <li><a href="/transcript/{{transcript.slug}}/export?method=word">Word Document</a></li>
+    </ul></li>
+    <li><a href="/transcript/{{transcript.slug}}/sql">SQL</a></li>
+  </ul>
+
 </div>
 
 <script>
   function playAudioSection(startTime, endTime) {
     var audio = document.getElementById('recording');
-    audio.pause();
+    if (!audio.paused) {
+      audio.pause();
+      return;
+    }
     audio.currentTime = startTime;
     audio.play();
-    audio.ontimeupdate = function() {
-        if (audio.currentTime >= endTime) {
-            audio.pause();
-            audio.ontimeupdate = null;
-        }
+    audio.ontimeupdate = function () {
+      if (audio.currentTime >= endTime) {
+        audio.pause();
+        audio.ontimeupdate = null;
+      }
     };
   }
 
   function updateSegmentTranscript(segmentId) {
-      var segmentElement = document.getElementById('segment_' + segmentId);
-      var newTranscript = segmentElement.innerText;
-      fetch('/transcript/{{transcript.slug}}/edit/segment/text/update/' + segmentId, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ "new_transcript": newTranscript }),
-      })
-      .then(response => response.json())
-      .then(data => {
-        showToast('Update successful!');
-        redrawTable();
-      })
-      .catch((error) => {
-        console.error('Error:', error);
-      });
+    var segmentElement = document.getElementById('segment_' + segmentId);
+    var newTranscript = segmentElement.innerText;
+    fetch('/transcript/{{transcript.slug}}/edit/segment/text/update/' + segmentId, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({"new_transcript": newTranscript}),
+    })
+    .then(response => response.json())
+    .then(data => {
+      showToast('Update successful!');
+      redrawTable();
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+    });
+  }
+
+  function updateSegmentSplit(segmentId, speaker_label, start_time, end_time) {
+    var segmentElement = document.getElementById('segment_' + segmentId);
+
+    var selection = window.getSelection()
+    var wholeText = selection.focusNode.wholeText
+    var offset = selection.anchorOffset
+    var pre_split_text = wholeText.slice(0,offset)
+    var post_split_text = wholeText.slice(offset)
+    var split_time = ((offset / wholeText.length) * (end_time - start_time)) + start_time
+
+    fetch('/transcript/{{transcript.slug}}/edit/segment/split/' + segmentId, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        "speaker_label":speaker_label,
+        "pre_split_text": pre_split_text,
+        "post_split_text": post_split_text,
+        "split_time": split_time,
+        "end_time": end_time,
+      }),
+    })
+    .then(response => response.json())
+    .then(data => {
+      showToast('Split successful!');
+      redrawTable();
+    })
+    .catch((error) => {
+      console.error('Error:', error);
+    });
   }
 
   function resetSegmentTranscript(segmentId) {
-      fetch('/transcript/{{transcript.slug}}/edit/segment/text/reset/' + segmentId, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-      .then(response => response.json())
-      .then(data => {
-        showToast('Reset successful!');
-        redrawTable();
-      })
-      .catch((error) => {
-        console.error('Error:', error);
-      });
+    fetch('/transcript/{{transcript.slug}}/edit/segment/text/reset/' + segmentId, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+            .then(response => response.json())
+            .then(data => {
+              showToast('Reset successful!');
+              redrawTable();
+            })
+            .catch((error) => {
+              console.error('Error:', error);
+            });
   }
 
   function showToast(message) {
-      var toast = document.createElement('div');
-      toast.setAttribute('class', 'toast');
-      toast.innerText = message;
-      document.body.appendChild(toast);
-      setTimeout(() => {
-          toast.remove();
-      }, 2000);
+    var toast = document.createElement('div');
+    toast.setAttribute('class', 'toast');
+    toast.innerText = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.remove();
+    }, 2000);
   }
 
   function redrawTable() {
     fetch('/transcript/{{transcript.slug}}/table/html')
-      .then(response => response.text())
-      .then(html => {
-    document.querySelector('.edit-table').innerHTML = html;
-    });
+            .then(response => response.text())
+            .then(html => {
+              document.querySelector('.edit-table').innerHTML = html;
+            });
   }
 
-  window.onload = function() {
+  window.onload = function () {
     redrawTable();
 
     // Handler for editable cells
-    document.querySelector('.edit-table').addEventListener('keydown', function(event) {
-        let td = event.target;
-        if (td.matches('td[contenteditable=true]')) {
-            if ((event.ctrlKey || event.metaKey) && (event.key === 'Enter' || event.keyCode === 13)) {
-                event.preventDefault();
-                let segment_id = td.id.replace('segment_', '');
-                let new_text = td.textContent;
-                updateSegmentTranscript(segment_id, new_text);
-            }
+    document.querySelector('.edit-table').addEventListener('keydown', function (event) {
+      let td = event.target;
+      if (td.matches('td[contenteditable=true]')) {
+        if ((event.ctrlKey || event.metaKey) && (event.key === 'Enter' || event.keyCode === 13)) {
+          event.preventDefault();
+          let segment_id = td.id.replace('segment_', '');
+          let new_text = td.textContent;
+          updateSegmentTranscript(segment_id, new_text);
         }
+      }
     });
 
     // Handler for merge buttons
-    document.querySelector('.edit-table').addEventListener('click', function(event) {
-        let button = event.target;
-        if (button.matches('.merge-button')) {
-            event.preventDefault();
-            let segmentId = button.dataset.id;
-            fetch(`/transcript/{{transcript.slug}}/edit/segment/merge/${segmentId}`, {
-                method: 'POST',
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                redrawTable();
-                showToast('Segment merge successful!');
-            })
-            .catch(error => {
-                console.error('There has been a problem with your fetch operation:', error);
-            });
-        }
-        // Handler for remove merge buttons
-        else if (button.matches('.remove-merge-button')) {
-            event.preventDefault();
-            let segmentId = button.dataset.id;
-            fetch(`/transcript/{{transcript.slug}}/edit/segment/unmerge/${segmentId}`, {
-                method: 'POST',
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                redrawTable();
-                showToast('Segment unmerge successful!');
-            })
-            .catch(error => {
-                console.error('There has been a problem with your fetch operation:', error);
-            });
-        }
+    document.querySelector('.edit-table').addEventListener('click', function (event) {
+      let button = event.target;
+      if (button.matches('.merge-button')) {
+        event.preventDefault();
+        let segmentId = button.dataset.id;
+        fetch(`/transcript/{{transcript.slug}}/edit/segment/merge/${segmentId}`, {
+          method: 'POST',
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          redrawTable();
+          showToast('Segment merge successful!');
+        })
+        .catch(error => {
+          console.error('There has been a problem with your fetch operation:', error);
+        });
+      }
+      // TODO: add listener for segment split
+      // Method should send segment_id, pre_split_text, post_split_text
+      // Send to endpoint `/transcript/{{transcript.slug}}/edit/segment/split/${segmentId}`
+      // In flask, I will pre_split_text and post_split_text from POST data
     });
   };
+
+    function updateSegmentSpeaker(select, segment_id) {
+      const speaker_label = select.value;
+      console.log(speaker_label, segment_id);
+      const url = '/transcript/{{transcript.slug}}/edit/segment/'+ segment_id +'/speaker/update/' + speaker_label;
+      fetch(url)
+      .catch((error) => console.error('Error:', error));
+    }
 
 </script>
 

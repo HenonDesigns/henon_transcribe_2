@@ -11,24 +11,3 @@ CREATE MACRO natural_key(a) AS regexp_extract_all(
            END
     }
 );
-
-create sequence merge_seq start 1;
-create table segment_merge (
-    id integer default nextval('merge_seq'),
-    segment_id int
-);
-
-create sequence transcript_edit_seq start 1;
-create table segment_transcript_edit (
-    id integer default nextval('transcript_edit_seq'),
-    segment_id int,
-    segment_ids int[],
-    transcript text
-);
-
-create sequence segment_note_seq start 1;
-create table segment_note (
-    id integer default nextval('segment_note_seq'),
-    segment_id int,
-    note text
-);

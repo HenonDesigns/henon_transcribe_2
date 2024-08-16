@@ -17,6 +17,7 @@ flask = "^3.0.3"
 duckdb-engine = "^0.13.1"
 python-slugify = "^8.0.4"
 attrs = "^24.2.0"
+pypandoc = "^1.13"
 
 
 [build-system]
