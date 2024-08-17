@@ -3,11 +3,10 @@
   <tr>
     <th>Root Segment</th>
     <th>Speaker</th>
-    <th style="width:110px;">Actions</th>
+    <th style="width:140px;">Actions</th>
     <th>Text</th>
     <th>Start</th>
-    <th>End</th>
-    <th>Audio</th>
+    <th>Duration</th>
   </tr>
 </thead>
 <tbody>
@@ -30,11 +29,11 @@
         {% endif %}
         <button onclick="updateSegmentSplit('{{row.id}}', '{{row.speaker_label}}', {{row.start_time}}, {{row.end_time}})">⤵️</button>
         <button onclick="updateSegmentTranscript('{{row.id}}')">✏️</button>
+        <button class=".button-black" onclick="playAudioSection({{ row.start_time }}, {{ row.end_time }})">⏯️</button>
       </td>
-      <td id="segment_{{row.id}}" contenteditable="true">{{row.transcript}}</td>
+      <td class="segment_text" id="segment_{{row.id}}" contenteditable="true">{{row.transcript}}</td>
       <td><code>{{row.start_time | seconds_to_time}}</code></td>
-      <td><code>{{row.end_time | seconds_to_time}}</code></td>
-      <td><button class=".button-black" onclick="playAudioSection({{ row.start_time }}, {{ row.end_time }})">⏯️</button></td>
+      <td><code>{{(row.end_time|float - row.start_time|float) | seconds_to_time}}</code></td>
     </tr>
   {% endfor %}
 </tbody>

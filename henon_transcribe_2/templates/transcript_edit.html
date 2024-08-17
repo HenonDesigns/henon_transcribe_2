@@ -5,6 +5,9 @@
 {% block content %}
 <div style="position: fixed; top: 40px; z-index: 100; width: 100%; background: #fff;">
   <audio controls id="recording" src="/{{transcript.recording_filepath}}" type="audio/mpeg"></audio>
+  <button onclick="setSpeed('decrease')">Speed -25%</button>
+  <button onclick="setSpeed('normal')">Speed Normal</button>
+  <button onclick="setSpeed('increase')">Speed +25%</button>
 </div>
 
 <div style="margin-top: 85px">
@@ -163,20 +166,85 @@
           console.error('There has been a problem with your fetch operation:', error);
         });
       }
-      // TODO: add listener for segment split
-      // Method should send segment_id, pre_split_text, post_split_text
-      // Send to endpoint `/transcript/{{transcript.slug}}/edit/segment/split/${segmentId}`
-      // In flask, I will pre_split_text and post_split_text from POST data
     });
   };
 
-    function updateSegmentSpeaker(select, segment_id) {
-      const speaker_label = select.value;
-      console.log(speaker_label, segment_id);
-      const url = '/transcript/{{transcript.slug}}/edit/segment/'+ segment_id +'/speaker/update/' + speaker_label;
-      fetch(url)
-      .catch((error) => console.error('Error:', error));
+  function updateSegmentSpeaker(select, segment_id) {
+    const speaker_label = select.value;
+    console.log(speaker_label, segment_id);
+    const url = '/transcript/{{transcript.slug}}/edit/segment/'+ segment_id +'/speaker/update/' + speaker_label;
+    fetch(url)
+    .catch((error) => console.error('Error:', error));
+  }
+
+  document.addEventListener('keydown', function(event) {
+    const audio = document.getElementById('recording');
+    if (!audio) return; // Exit if audio element is not found// Detect cmd + space for play/pause
+
+    if (event.metaKey && event.code === 'Space') {
+        event.preventDefault(); // Prevent default browser behavior
+    if (audio.paused) {
+            audio.play();
+        } else {
+            audio.pause();
+        }
     }
+
+    if (event.metaKey && event.code === 'ArrowLeft') {
+        event.preventDefault();
+        audio.currentTime = Math.max(0, audio.currentTime - 1);
+    }
+
+    if (event.metaKey && event.code === 'ArrowRight') {
+      event.preventDefault();
+      audio.currentTime = Math.min(audio.duration, audio.currentTime + 1);
+    }
+
+    if (event.metaKey && event.code === 'ArrowUp') {
+      event.preventDefault();
+      setSpeed('increase');
+    }
+
+    if (event.metaKey && event.code === 'ArrowDown') {
+      event.preventDefault();
+      setSpeed('decrease');
+    }
+
+  });
+
+  function setSpeed(change){
+    const min_speed = 0.25
+    const max_speed = 2
+    let speed_inc = 0.25
+    const audio = document.getElementById('recording');
+    if (change == 'decrease') {
+    audio.playbackRate = Math.max(min_speed, audio.playbackRate - speed_inc);
+    } else if (change == 'normal') {
+        audio.playbackRate = 1.0;
+    } else if (change == 'increase') {
+        audio.playbackRate = Math.min(max_speed, audio.playbackRate + speed_inc);
+    }
+    console.log(`Speed: ${audio.playbackRate.toFixed(1)}x`);
+  }
+
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Tab') {
+        const activeElement = document.activeElement;
+        const segments = document.querySelectorAll('.segment_text');
+        const index = Array.prototype.indexOf.call(segments, activeElement);
+        if (index > -1) {
+            event.preventDefault();
+            let nextIndex;
+            if (event.shiftKey) {
+                nextIndex = (index - 1 + segments.length) % segments.length;
+            } else {
+                nextIndex = (index + 1) % segments.length;
+            }
+            segments[nextIndex].focus();
+        }
+    }
+});
+
 
 </script>
 

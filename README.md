@@ -21,9 +21,9 @@ S3_BUCKET="henon-transcribe"
 ```
 
 ## TODO
+- add speakers, even when dropped from unique list
 - "notes" field for each segment
   - can they be exported as comments in the word doc
-- add speakers, even when dropped from unique list
 - modify timestamps for segment
   - start: update previous segment end time
   - end: update next segment start time
