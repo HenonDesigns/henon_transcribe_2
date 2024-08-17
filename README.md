@@ -27,3 +27,7 @@ S3_BUCKET="henon-transcribe"
 - modify timestamps for segment
   - start: update previous segment end time
   - end: update next segment start time
+- audio
+  - spacebar start/stop
+  - left/right jump around a little bit
+  - different speeds?
