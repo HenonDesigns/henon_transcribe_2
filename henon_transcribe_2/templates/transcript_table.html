@@ -1,11 +1,12 @@
 <table class="edit-table" border="1">
 <thead>
   <tr>
-    <th>Root Segment</th>
+    <th>ID</th>
     <th>Speaker</th>
     <th style="width:140px;">Actions</th>
     <th>Text</th>
     <th>Start</th>
+    <th>End</th>
     <th>Duration</th>
   </tr>
 </thead>
@@ -33,6 +34,7 @@
       </td>
       <td class="segment_text" id="segment_{{row.id}}" contenteditable="true">{{row.transcript}}</td>
       <td><code>{{row.start_time | seconds_to_time}}</code></td>
+      <td><code>{{row.end_time | seconds_to_time}}</code></td>
       <td><code>{{(row.end_time|float - row.start_time|float) | seconds_to_time}}</code></td>
     </tr>
   {% endfor %}
