@@ -29,5 +29,7 @@ S3_BUCKET="henon-transcribe"
   - end: update next segment start time
 - audio
   - spacebar start/stop
-  - left/right jump around a little bit
-  - different speeds?
+- save/backup
+  - make async; make easier to see and run from editor
+  - consider running automatically every 1 minute?  5 minutes?
+  - support loading from backup

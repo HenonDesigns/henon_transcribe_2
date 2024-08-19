@@ -394,6 +394,15 @@ def transcript_export(slug):
         return "Export method not recognized."
 
 
+@app.route("/transcript/<slug>/backup")
+@requires_auth
+def transcript_backup(slug):
+    transcript = Transcript.load(slug=slug)
+    print("backing up duckdb to S3")
+    upload_file_to_s3(transcript.db_filepath)
+    return redirect(url_for("transcript_edit", slug=slug))
+
+
 def main():
     app.run(debug=True)
 
