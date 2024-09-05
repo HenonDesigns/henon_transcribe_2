@@ -2,6 +2,9 @@ FROM python:3.12
 
 WORKDIR /app
 
+RUN apt update
+RUN apt install -y pandoc
+
 RUN pip install --no-cache-dir uwsgi
 
 COPY requirements.txt /app
