@@ -16,7 +16,10 @@
 
 <div style="margin-top: 20px">
   <ul>
-    <li><a href="/transcript/{{transcript.slug}}/backup">Save / Backup</a></li>
+    <li>Backup:<ul>
+      <li><a href="/transcript/{{transcript.slug}}/backup/save">Save</a></li>
+    </ul>
+    </li>
     <li>Export:<ul>
       <li><a href="/transcript/{{transcript.slug}}/export?method=html">HTML</a></li>
       <li><a href="/transcript/{{transcript.slug}}/export?method=word">Word Document</a></li>
@@ -248,5 +251,11 @@
 
 
 </script>
+
+<div>
+  {% if toast_message %}
+    <script>showToast('{{toast_message}}')</script>
+  {% endif %}
+</div>
 
 {% endblock %}

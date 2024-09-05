@@ -11,6 +11,7 @@ from flask import (
     url_for,
     send_from_directory,
     Response,
+    session,
 )
 import pypandoc
 from werkzeug.utils import secure_filename
@@ -25,6 +26,7 @@ from henon_transcribe_2.core import (
 )
 
 app = Flask(__name__)
+app.secret_key = "HenonDesignsTranscribeV2"
 
 USERNAME = os.environ.get("APP_USERNAME")
 PASSWORD = os.environ.get("APP_PASSWORD")
@@ -149,11 +151,19 @@ def transcript_edit(slug):
 
     segments_df = get_segments_pretty_merged(transcript.db_filepath)
 
+    # get toast messages from session
+    toast_message = session.get("toast_message")
+    try:
+        session.pop("toast_message")
+    except:
+        pass
+
     return render_template(
         "transcript_edit.html",
         transcript=transcript,
         segments_df=segments_df,
         recording_filename=transcript.recording_filepath,
+        toast_message=toast_message,
     )
 
 
@@ -394,13 +404,20 @@ def transcript_export(slug):
         return "Export method not recognized."
 
 
-@app.route("/transcript/<slug>/backup")
+@app.route("/transcript/<slug>/backup/save")
 @requires_auth
-def transcript_backup(slug):
+def transcript_backup_save(slug):
     transcript = Transcript.load(slug=slug)
     print("backing up duckdb to S3")
     upload_file_to_s3(transcript.db_filepath)
+    session["toast_message"] = "Backup successful!"
     return redirect(url_for("transcript_edit", slug=slug))
+
+
+@app.route("/transcript/<slug>/backup/load")
+@requires_auth
+def transcript_backup_load(slug):
+    raise NotImplementedError()
 
 
 def main():
