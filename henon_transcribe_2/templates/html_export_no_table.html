@@ -1,0 +1,52 @@
+<html>
+    <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+        >
+        <style>
+            .segment {
+                display: grid;
+                grid-template-columns: 1fr 1fr 4fr 1fr 1fr;
+                grid-gap: 1rem;
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+            .segment-header {
+                display: grid;
+                grid-template-columns: 1fr 1fr 4fr 1fr 1fr;
+                grid-gap: 1rem;
+                font-weight: bold;
+                padding: 1rem 0;
+            }
+            .segment-id, .segment-speaker, .segment-text, .segment-start, .segment-end {
+                padding: 0.5rem;
+            }
+            /* Remove borders from code blocks */
+            code {
+                background: none;
+                padding: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <main class="container">
+            <div class="segment-header">
+                <div>Segment ID</div>
+                <div>Speaker</div>
+                <div>Text</div>
+                <div>Start</div>
+                <div>End</div>
+            </div>
+            {% for idx, row in segments_df.iterrows() %}
+            <div class="segment">
+                <div class="segment-id"><code>{{ row.id }}</code></div>
+                <div class="segment-speaker"><code>{{ row.speaker_name }}</code></div>
+                <div class="segment-text">{{ row.transcript }}</div>
+                <div class="segment-start"><code>{{ row.start_time | seconds_to_time }}</code></div>
+                <div class="segment-end"><code>{{ row.end_time | seconds_to_time }}</code></div>
+            </div>
+            {% endfor %}
+        </main>
+    </body>
+</html>
